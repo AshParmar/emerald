@@ -53,9 +53,13 @@ export function Interview() {
     const deepgramWsRef = useRef<WebSocket | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const userStreamRef = useRef<MediaStream | null>(null);
-    const audioCtxRef = useRef<AudioContext | null>(null);
+    const captureCtxRef = useRef<AudioContext | null>(null);   // 16kHz — mic capture only
+    const playbackCtxRef = useRef<AudioContext | null>(null);  // browser default — AI audio playback
     const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
     const rafRef = useRef<number | null>(null);
+    const isAiSpeakingRef = useRef<boolean>(false);            // true while AI audio chunks are queued
+    const lastActivityEndRef = useRef<number>(0);              // timestamp of last activity_end sent
+    const isMicActiveRef = useRef<boolean>(false);             // gate: only send mic audio during user turns
 
     // Playback timing queue for AI audio chunks
     const nextPlayTimeRef = useRef<number>(0);
@@ -65,15 +69,20 @@ export function Interview() {
         let cancelled = false;
 
         (async () => {
-            // 1. Initialize Audio Context (Standardized at 16kHz for microphone sampling)
-            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
+            // 1a. Capture context at 16kHz — only used for mic → Vertex AI
+            const captureCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
                 sampleRate: 16000
             });
-            console.log("ACTUAL AUDIO CONTEXT SAMPLE RATE:", audioCtx.sampleRate);
-            audioCtxRef.current = audioCtx;
+            console.log("ACTUAL AUDIO CONTEXT SAMPLE RATE:", captureCtx.sampleRate);
+            captureCtxRef.current = captureCtx;
 
-            // Setup Analyser for the AI's voice level meter
-            const aiAnalyser = audioCtx.createAnalyser();
+            // 1b. Playback context at browser default rate — used for AI audio + analyser
+            const playbackCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            console.log("PLAYBACK AUDIO CONTEXT SAMPLE RATE:", playbackCtx.sampleRate);
+            playbackCtxRef.current = playbackCtx;
+
+            // Setup Analyser for the AI's voice level meter (on playback context)
+            const aiAnalyser = playbackCtx.createAnalyser();
             aiAnalyser.fftSize = 512;
             aiAnalyser.smoothingTimeConstant = 0.8;
             aiAnalyserRef.current = aiAnalyser;
@@ -92,14 +101,23 @@ export function Interview() {
 
             let userMeter: (() => number) | null = null;
 
-            // 2. Request microphone access
-            const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // 2. Request microphone access WITH echo cancellation to prevent AI audio loopback
+            const ms = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                }
+            });
             if (cancelled) {
                 ms.getTracks().forEach((t) => t.stop());
                 return;
             }
             userStreamRef.current = ms;
-            userMeter = createLevelMeter(audioCtx, ms);
+            // Mute mic initially — only unmute when it's the user's turn
+            ms.getAudioTracks().forEach(t => { t.enabled = false; });
+            // User level meter uses capture context (both at 16kHz — consistent)
+            userMeter = createLevelMeter(captureCtx, ms);
 
             // 3. Setup WebSocket connection to our Python backend
             const wsScheme = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -110,7 +128,7 @@ export function Interview() {
             const backendWs = new WebSocket(backendWsUrl);
             backendWsRef.current = backendWs;
 
-            // Helper to play back Gemini raw PCM chunks
+            // Helper to play back Gemini raw PCM chunks (uses playbackCtx, NOT captureCtx)
             const playPcmChunk = (pcmBase64: string) => {
                 try {
                     const binaryString = window.atob(pcmBase64);
@@ -127,22 +145,30 @@ export function Interview() {
                         float32[i] = int16[i]! / 32768.0;
                     }
 
-                    // Gemini Multimodal Live API returns 24kHz audio output
-                    const audioBuffer = audioCtx.createBuffer(1, float32.length, 24000);
+                    // Gemini Multimodal Live API returns 24kHz audio — use playbackCtx so it plays correctly
+                    const audioBuffer = playbackCtx.createBuffer(1, float32.length, 24000);
                     audioBuffer.copyToChannel(float32, 0);
 
-                    const source = audioCtx.createBufferSource();
+                    const source = playbackCtx.createBufferSource();
                     source.buffer = audioBuffer;
 
                     // Connect buffer source to AI analyser and speakers
                     source.connect(aiAnalyser);
-                    source.connect(audioCtx.destination);
+                    source.connect(playbackCtx.destination);
 
                     // Queue audio chunks continuously to prevent clicking/gaps
-                    const currentTime = audioCtx.currentTime;
+                    const currentTime = playbackCtx.currentTime;
                     if (nextPlayTimeRef.current < currentTime) {
                         nextPlayTimeRef.current = currentTime;
                     }
+                    // Mark AI as speaking; clear the flag when this chunk finishes playing
+                    isAiSpeakingRef.current = true;
+                    source.onended = () => {
+                        // Only clear if nothing else is queued (i.e., currentTime >= nextPlayTime)
+                        if (playbackCtx.currentTime >= nextPlayTimeRef.current - 0.05) {
+                            isAiSpeakingRef.current = false;
+                        }
+                    };
                     source.start(nextPlayTimeRef.current);
                     nextPlayTimeRef.current += audioBuffer.duration;
                 } catch (e) {
@@ -158,18 +184,18 @@ export function Interview() {
                 setStatus("live");
 
                 // Start recording raw microphone and streaming it to the backend
-                const source = audioCtx.createMediaStreamSource(ms);
-                // Buffer size 2048, 1 input channel, 1 output channel
-                const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+                // captureCtx is already at 16kHz, so ratio=1 — no downsampling needed
+                const source = captureCtx.createMediaStreamSource(ms);
+                const processor = captureCtx.createScriptProcessor(2048, 1, 1);
                 audioProcessorRef.current = processor;
 
                 source.connect(processor);
-                processor.connect(audioCtx.destination);
+                processor.connect(captureCtx.destination);
 
                 processor.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
-                    // Downsample to exactly 16000Hz for Vertex AI
-                    const inputRate = audioCtxRef.current?.sampleRate || 16000;
+                    // captureCtx is already 16kHz — no resampling needed
+                    const inputRate = captureCtxRef.current?.sampleRate || 16000;
                     const outputRate = 16000;
                     const ratio = inputRate / outputRate;
                     
@@ -182,8 +208,8 @@ export function Interview() {
                         pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                     }
 
-                    // Send base64 PCM over WebSocket
-                    if (backendWs.readyState === WebSocket.OPEN) {
+                // Send base64 PCM over WebSocket — but only during user's turn
+                    if (backendWs.readyState === WebSocket.OPEN && isMicActiveRef.current) {
                         const base64Audio = arrayBufferToBase64(pcmData.buffer);
                         backendWs.send(JSON.stringify({ audio: base64Audio }));
                     }
@@ -198,14 +224,18 @@ export function Interview() {
                     playPcmChunk(data.audio);
                 }
                 
-                // When AI finishes its turn, send activity_end so Vertex AI listens for user
+                // When AI finishes its turn — wait for audio to drain, then unmute mic for user
                 if (data.turn_complete) {
+                    const drainMs = Math.max(1000, (nextPlayTimeRef.current - (playbackCtxRef.current?.currentTime ?? 0)) * 1000 + 400);
                     setTimeout(() => {
-                        if (backendWs.readyState === WebSocket.OPEN) {
-                            backendWs.send(JSON.stringify({ type: "activity_end" }));
-                        }
-                    }, 300);
+                        isAiSpeakingRef.current = false;
+                        isMicActiveRef.current = true;
+                        // Physically unmute the mic track so Vertex AI VAD can hear user
+                        userStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = true; });
+                        console.log("[turn_complete] AI audio drained — mic unmuted for user");
+                    }, drainMs);
                 }
+
             };
 
             backendWs.onclose = () => {
@@ -252,8 +282,9 @@ export function Interview() {
             // VAD variables
             let isUserCurrentlySpeaking = false;
             let lastSpeechTime = performance.now();
-            const SILENCE_THRESHOLD = 0.03;  // Low threshold - pick up any speech above background
+            const SILENCE_THRESHOLD = 0.03;
             const SILENCE_DURATION_MS = 1500;
+            const ACTIVITY_END_COOLDOWN_MS = 3000; // prevent spamming activity_end
 
             // Animation tick driving the volume visualizers
             const tick = () => {
@@ -264,21 +295,38 @@ export function Interview() {
                     const currentLevel = userMeter();
                     setUserLevel(currentLevel);
 
-                    // Client-side Voice Activity Detection
-                    if (currentLevel > SILENCE_THRESHOLD && currentLevel > currentAiLevel) {
-                        isUserCurrentlySpeaking = true;
-                        lastSpeechTime = performance.now();
-                    } else {
-                        // Volume is low
-                        if (isUserCurrentlySpeaking && (performance.now() - lastSpeechTime > SILENCE_DURATION_MS)) {
-                            // User finished speaking!
-                            isUserCurrentlySpeaking = false;
-                            
-                            // Send "activity_end" to explicitly tell Vertex AI the user stopped speaking
-                            if (backendWs.readyState === WebSocket.OPEN) {
-                                backendWs.send(JSON.stringify({ type: "activity_end" }));
+                    // Only do VAD when AI is NOT speaking and mic is open
+                    if (!isAiSpeakingRef.current && isMicActiveRef.current) {
+                        if (currentLevel > SILENCE_THRESHOLD) {
+                            if (!isUserCurrentlySpeaking) {
+                                // User just started speaking — signal Vertex AI to start collecting audio
+                                isUserCurrentlySpeaking = true;
+                                console.log("[VAD] User started speaking — sending activity_start");
+                                if (backendWs.readyState === WebSocket.OPEN) {
+                                    backendWs.send(JSON.stringify({ type: "activity_start" }));
+                                }
+                            }
+                            lastSpeechTime = performance.now();
+                        } else {
+                            if (isUserCurrentlySpeaking && (performance.now() - lastSpeechTime > SILENCE_DURATION_MS)) {
+                                isUserCurrentlySpeaking = false;
+                                const now = performance.now();
+                                if (now - lastActivityEndRef.current > ACTIVITY_END_COOLDOWN_MS) {
+                                    lastActivityEndRef.current = now;
+                                    isMicActiveRef.current = false;
+                                    // Physically mute the mic track
+                                    userStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false; });
+                                    console.log("[VAD] User stopped speaking — sending activity_end, mic muted");
+                                    if (backendWs.readyState === WebSocket.OPEN) {
+                                        backendWs.send(JSON.stringify({ type: "activity_end" }));
+                                    }
+                                }
                             }
                         }
+                    } else if (isAiSpeakingRef.current) {
+                        // AI is speaking — reset user speech state so we don't get false triggers
+                        isUserCurrentlySpeaking = false;
+                        lastSpeechTime = performance.now();
                     }
                 }
                 
@@ -333,7 +381,10 @@ export function Interview() {
             } catch (e) {}
 
             try {
-                audioCtxRef.current?.close().catch(() => {});
+                captureCtxRef.current?.close().catch(() => {});
+            } catch (e) {}
+            try {
+                playbackCtxRef.current?.close().catch(() => {});
             } catch (e) {}
         } catch (globalError) {
             console.error("Global error in cleanup:", globalError);

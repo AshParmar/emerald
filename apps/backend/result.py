@@ -29,93 +29,93 @@ def get_llm():
 # --- Node 1: Technical Knowledge Evaluation ---
 def evaluate_technical_correctness(state: GradingState) -> dict:
     llm = get_llm()
-    prompt = f"""
-    You are an expert technical interviewer. Analyze the following transcript of an interview.
-    Evaluate the candidate's technical correctness. Note what concepts they explained well, where they had mistakes,
-    and any major knowledge gaps in software engineering or coding.
-    
-    Transcript:
-    {state['transcript_text']}
-    
-    Provide a concise technical evaluation summary.
-    """
+    prompt = f"""You are an expert technical interviewer evaluating a candidate.
+
+Below is the interview content. It may be a full conversation transcript, or it may be a candidate
+profile summary when live transcription was unavailable.
+
+Interview Content:
+{state['transcript_text']}
+
+Based on the above, evaluate the candidate's technical capabilities. Consider their listed skills,
+background, and any answers they gave. If only a profile summary is available, give a fair assessment
+based on the depth of their skill set and experience.
+
+Provide a concise technical evaluation (2-3 sentences)."""
     response = llm.invoke(prompt)
-    return {
-        "technical_feedback": response.content
-    }
+    return {"technical_feedback": response.content}
 
 # --- Node 2: Communication Skills Evaluation ---
 def evaluate_communication_skills(state: GradingState) -> dict:
     llm = get_llm()
-    prompt = f"""
-    You are an expert evaluator. Analyze the following transcript of an interview.
-    Evaluate the candidate's communication skills. Note their explanation structure, clarity, 
-    confidence, and whether they answered questions directly or beat around the bush.
-    
-    Transcript:
-    {state['transcript_text']}
-    
-    Provide a concise communication evaluation summary.
-    """
+    prompt = f"""You are an expert evaluator assessing a candidate after a voice technical interview.
+
+Interview Content:
+{state['transcript_text']}
+
+Based on the above, evaluate communication and presentation skills. If only a profile summary is
+available (transcription unavailable), base your assessment on the breadth and presentation of their
+documented experience and skill diversity.
+
+Provide a concise communication evaluation (2-3 sentences)."""
     response = llm.invoke(prompt)
-    return {
-        "communication_feedback": response.content
-    }
+    return {"communication_feedback": response.content}
 
 # --- Node 3: Final Grading Compiler (Structured Output) ---
 def compile_final_result(state: GradingState) -> dict:
     llm = get_llm()
-    # Enforce Pydantic structured output
     structured_llm = llm.with_structured_output(FinalGrade)
-    
-    prompt = f"""
-    You are a final panel evaluator. Compile the following technical and communication evaluation notes into a final score (0 to 10)
-    and a cohesive summary of feedback for the candidate.
-    
-    Transcript:
-    {state['transcript_text']}
-    
-    Technical Notes:
-    {state['technical_feedback']}
-    
-    Communication Notes:
-    {state['communication_feedback']}
-    
-    Provide the output matching the requested schema.
-    """
+
+    prompt = f"""You are a final panel evaluator compiling interview results.
+
+Interview Content:
+{state['transcript_text']}
+
+Technical Evaluation:
+{state['technical_feedback']}
+
+Communication Evaluation:
+{state['communication_feedback']}
+
+Compile a final score (1-10) and cohesive written feedback for the candidate.
+Even if only a profile summary is available, give a score reflecting their apparent skill level.
+A score of 0 means "transcript not provided" — NEVER return 0; always return at least 1.
+Be constructive and specific."""
+
     result: FinalGrade = structured_llm.invoke(prompt)
     return {
-        "final_score": result.score,
+        "final_score": max(1, result.score),  # ensure never 0
         "final_feedback": result.feedback
     }
 
 # 3. Construct the LangGraph State Graph
 workflow = StateGraph(GradingState)
-
-# Add our evaluation steps as nodes
 workflow.add_node("tech_eval", evaluate_technical_correctness)
 workflow.add_node("comm_eval", evaluate_communication_skills)
 workflow.add_node("compiler", compile_final_result)
 
-# Connect the nodes with directional edges
 workflow.add_edge(START, "tech_eval")
 workflow.add_edge("tech_eval", "comm_eval")
 workflow.add_edge("comm_eval", "compiler")
 workflow.add_edge("compiler", END)
 
-# Compile the workflow graph
 grading_graph = workflow.compile()
 
 # --- External facing function ---
 def calculate_result(messages) -> dict:
     """Formats messages from DB, runs them through the LangGraph, and returns the score and feedback."""
+    if not messages:
+        return {
+            "score": 0,
+            "feedback": "No interview data available to grade."
+        }
+
     formatted_transcript = ""
     for msg in messages:
         sender = msg.type.value if hasattr(msg.type, "value") else str(msg.type)
         content = msg.message
-        formatted_transcript += f"{sender}: {content}\n"
-    
-    # Run the graph
+        formatted_transcript += f"{sender}: {content}\n\n"
+
     initial_state = {
         "transcript_text": formatted_transcript,
         "technical_feedback": "",
@@ -124,7 +124,7 @@ def calculate_result(messages) -> dict:
         "final_feedback": ""
     }
     final_output = grading_graph.invoke(initial_state)
-    
+
     return {
         "score": final_output["final_score"],
         "feedback": final_output["final_feedback"]
