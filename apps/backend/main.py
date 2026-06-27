@@ -95,9 +95,10 @@ def _run_grading(interview_id: str):
     """Blocking grading task — runs in a thread pool so it doesn't block the event loop."""
     import time
     # Wait for sideband.py's finally block to finish saving profile summary / transcript
-    # (browser navigates to results page before the WebSocket session fully tears down)
     time.sleep(4)
 
+    # 1. Fetch messages first and release the DB session/connection immediately
+    messages = []
     with Session(engine) as db:
         interview = db.get(Interview, interview_id)
         if not interview or interview.status == InterviewStatus.DONE:
@@ -107,17 +108,34 @@ def _run_grading(interview_id: str):
             statement = select(Message).where(Message.interview_id == interview_id).order_by(Message.created_at)
             messages = db.exec(statement).all()
             print(f"[grading] Found {len(messages)} messages for {interview_id[:8]}")
-            evaluation = calculate_result(messages)
-            interview.score = evaluation["score"]
-            interview.feedback = evaluation["feedback"]
-            interview.status = InterviewStatus.DONE
-            db.add(interview)
-            db.commit()
-            print(f"[grading] Completed for {interview_id[:8]}: score={evaluation['score']}")
         except Exception as e:
-            print(f"[grading] Error for {interview_id}: {e}")
-        finally:
+            print(f"[grading] Error fetching messages for {interview_id}: {e}")
             _grading_in_progress.discard(interview_id)
+            return
+
+    # 2. Invoke the LLM evaluation OUTSIDE of any database session to avoid locking SQLite
+    try:
+        evaluation = calculate_result(messages)
+    except Exception as e:
+        print(f"[grading] Error calling LLM for {interview_id}: {e}")
+        _grading_in_progress.discard(interview_id)
+        return
+
+    # 3. Open a new brief database session to commit the results
+    try:
+        with Session(engine) as db:
+            interview = db.get(Interview, interview_id)
+            if interview and interview.status != InterviewStatus.DONE:
+                interview.score = evaluation["score"]
+                interview.feedback = evaluation["feedback"]
+                interview.status = InterviewStatus.DONE
+                db.add(interview)
+                db.commit()
+                print(f"[grading] Completed for {interview_id[:8]}: score={evaluation['score']}")
+    except Exception as e:
+        print(f"[grading] Error saving grading result for {interview_id}: {e}")
+    finally:
+        _grading_in_progress.discard(interview_id)
 
 
 # --- Endpoint 4: Fetch Grading Results & Transcript ---

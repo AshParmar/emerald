@@ -1,0 +1,216 @@
+[2026-06-27 10:37:26.671] [sideband] WebSocket accepted for interview b422dbfc
+[2026-06-27 10:37:26.742] [sideband] Connecting to Vertex AI Live API...
+[2026-06-27 10:37:29.280] [sideband] Connected to Vertex AI Live API!
+[2026-06-27 10:37:29.282] [sideband] Sent initial text prompt
+[2026-06-27 10:37:29.285] [client_to_gemini] Started
+[2026-06-27 10:37:29.285] [gemini_to_client] Started
+[2026-06-27 10:37:30.097] [transcript] AI: Hi Ashish,
+[2026-06-27 10:37:30.550] [transcript] AI: I'm one
+[2026-06-27 10:37:30.636] [transcript] AI: of the interviewers
+[2026-06-27 10:37:30.937] [transcript] AI: today.
+[2026-06-27 10:37:31.067] [transcript] AI: Your resume
+[2026-06-27 10:37:31.225] [transcript] AI: shows
+[2026-06-27 10:37:31.231] [transcript] AI: significant
+[2026-06-27 10:37:31.335] [transcript] AI: experience
+[2026-06-27 10:37:31.372] [transcript] AI: with
+[2026-06-27 10:37:31.437] [transcript] AI: LLM
+[2026-06-27 10:37:31.453] [transcript] AI: pipelines.
+[2026-06-27 10:37:31.538] [transcript] AI: Can you
+[2026-06-27 10:37:31.637] [transcript] AI: describe
+[2026-06-27 10:37:31.751] [transcript] AI: a complex
+[2026-06-27 10:37:31.943] [transcript] AI: RAG
+[2026-06-27 10:37:31.984] [transcript] AI: system
+[2026-06-27 10:37:32.067] [transcript] AI: you worked
+[2026-06-27 10:37:32.161] [transcript] AI: on,
+[2026-06-27 10:37:32.253] [transcript] AI: and
+[2026-06-27 10:37:32.288] [transcript] AI: how you
+[2026-06-27 10:37:32.358] [transcript] AI: managed
+[2026-06-27 10:37:32.458] [transcript] AI: the chunking
+[2026-06-27 10:37:32.609] [transcript] AI: and vectorization
+[2026-06-27 10:37:32.784] [transcript] AI: process?
+[2026-06-27 10:37:32.969] [gemini_to_client] turn_complete — AI turn #1
+[2026-06-27 10:37:32.979] [db] Saved AI msg (219 chars)
+[2026-06-27 10:37:46.433] [client_to_gemini] activity_start → Vertex AI
+[2026-06-27 10:38:10.546] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 10:38:11.571] [transcript] AI: That's interesting
+[2026-06-27 10:38:11.780] [transcript] User: So, yeah. I've recently worked on my junior project. It's an AI radiology report
+[2026-06-27 10:38:11.790] [transcript] AI: you used
+[2026-06-27 10:38:11.879] [transcript] AI: hybrid
+[2026-06-27 10:38:11.909] [transcript] AI: retrieval.
+[2026-06-27 10:38:12.088] [transcript] AI: Regarding
+[2026-06-27 10:38:12.288] [transcript] AI: the data
+[2026-06-27 10:38:12.391] [transcript] AI: pipelines,
+[2026-06-27 10:38:12.515] [transcript] AI: your resume
+[2026-06-27 10:38:12.650] [transcript] AI: mentions
+[2026-06-27 10:38:12.813] [transcript] AI: designing
+[2026-06-27 10:38:12.915] [transcript] AI: data
+[2026-06-27 10:38:13.004] [transcript] AI: preparation
+[2026-06-27 10:38:13.111] [transcript] AI: workflows.
+[2026-06-27 10:38:13.234] [transcript] AI: What
+[2026-06-27 10:38:13.416] [transcript] AI: tools
+[2026-06-27 10:38:13.516] [transcript] AI: did you
+[2026-06-27 10:38:13.522] [transcript] AI: use
+[2026-06-27 10:38:13.620] [transcript] AI: for that,
+[2026-06-27 10:38:13.729] [transcript] AI: and how
+[2026-06-27 10:38:13.756] [transcript] AI: did you
+[2026-06-27 10:38:13.858] [transcript] AI: handle
+[2026-06-27 10:38:13.928] [transcript] AI: data
+[2026-06-27 10:38:13.951] [transcript] AI: quality
+[2026-06-27 10:38:14.031] [transcript] AI: issues?
+[2026-06-27 10:38:14.190] [gemini_to_client] turn_complete — AI turn #2
+[2026-06-27 10:38:14.202] [db] Saved user msg (298 chars)
+[2026-06-27 10:38:14.211] [db] Saved AI msg (211 chars)
+[2026-06-27 10:38:25.261] [client_to_gemini] activity_start → Vertex AI
+[2026-06-27 10:38:27.510] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 10:38:28.063] [transcript] User: Basset sorry
+[2026-06-27 10:38:28.466] [transcript] AI: No problem.
+[2026-06-27 10:38:28.778] [transcript] AI: You have
+[2026-06-27 10:38:28.891] [transcript] AI: experience
+[2026-06-27 10:38:29.030] [transcript] AI: with
+[2026-06-27 10:38:29.086] [transcript] AI: Docker
+[2026-06-27 10:38:29.218] [transcript] AI: and CI/CD
+[2026-06-27 10:38:29.404] [transcript] AI: pipelines.
+[2026-06-27 10:38:29.594] [transcript] AI: Can
+[2026-06-27 10:38:29.704] [transcript] AI: you explain
+[2026-06-27 10:38:29.821] [transcript] AI: how you
+[2026-06-27 10:38:29.899] [transcript] AI: containerized
+[2026-06-27 10:38:30.063] [transcript] AI: a machine
+[2026-06-27 10:38:30.143] [transcript] AI: learning
+[2026-06-27 10:38:30.213] [transcript] AI: model
+[2026-06-27 10:38:30.314] [transcript] AI: and
+[2026-06-27 10:38:30.366] [transcript] AI: integrated
+[2026-06-27 10:38:30.515] [transcript] AI: it into
+[2026-06-27 10:38:30.617] [transcript] AI: a CI/CD
+[2026-06-27 10:38:30.736] [transcript] AI: workflow?
+[2026-06-27 10:38:30.938] [gemini_to_client] turn_complete — AI turn #3
+[2026-06-27 10:38:30.951] [db] Saved user msg (12 chars)
+[2026-06-27 10:38:30.963] [db] Saved AI msg (168 chars)
+[2026-06-27 10:38:40.608] [client_to_gemini] activity_start → Vertex AI
+[2026-06-27 10:39:11.604] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 10:39:12.604] [transcript] AI: Thank you,
+[2026-06-27 10:39:12.752] [transcript] AI: Ashish.
+[2026-06-27 10:39:12.804] [transcript] User: externalization I will use Docker which is where I create an image of my uh syst
+[2026-06-27 10:39:12.908] [transcript] AI: That concludes
+[2026-06-27 10:39:13.026] [transcript] AI: the interview.
+[2026-06-27 10:39:13.215] [transcript] AI: It was
+[2026-06-27 10:39:13.318] [transcript] AI: great
+[2026-06-27 10:39:13.332] [transcript] AI: learning
+[2026-06-27 10:39:13.421] [transcript] AI: about
+[2026-06-27 10:39:13.454] [transcript] AI: your experience.
+[2026-06-27 10:39:13.628] [transcript] AI: Goodbye.
+[2026-06-27 10:39:13.939] [gemini_to_client] turn_complete — AI turn #4
+[2026-06-27 10:39:13.946] [db] Saved user msg (365 chars)
+[2026-06-27 10:39:13.956] [db] Saved AI msg (102 chars)
+[2026-06-27 10:39:13.957] [sideband] Ending session (is_final_turn=True, turn=4)
+[2026-06-27 11:14:04.235] [sideband] WebSocket accepted for interview 3c1248a5
+[2026-06-27 11:14:04.311] [sideband] Connecting to Vertex AI Live API...
+[2026-06-27 11:14:07.145] [sideband] Connected to Vertex AI Live API!
+[2026-06-27 11:14:07.147] [sideband] Sent initial text prompt
+[2026-06-27 11:14:07.148] [client_to_gemini] Started
+[2026-06-27 11:14:07.154] [gemini_to_client] Started
+[2026-06-27 11:14:07.261] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 11:14:07.956] [transcript] AI: Hello, I'm
+[2026-06-27 11:14:08.488] [transcript] AI: an AI
+[2026-06-27 11:14:08.808] [transcript] AI: interviewer.
+[2026-06-27 11:14:08.881] [transcript] AI: Based
+[2026-06-27 11:14:09.005] [transcript] AI: on your
+[2026-06-27 11:14:09.026] [transcript] AI: resume,
+[2026-06-27 11:14:09.098] [transcript] AI: could
+[2026-06-27 11:14:09.186] [transcript] AI: you tell
+[2026-06-27 11:14:09.192] [transcript] AI: me a
+[2026-06-27 11:14:11.364] [sideband] WebSocket accepted for interview 3c1248a5
+[2026-06-27 11:14:11.492] [sideband] Connecting to Vertex AI Live API...
+[2026-06-27 11:14:14.224] [sideband] Connected to Vertex AI Live API!
+[2026-06-27 11:14:14.226] [sideband] Sent initial text prompt
+[2026-06-27 11:14:14.228] [client_to_gemini] Started
+[2026-06-27 11:14:14.231] [gemini_to_client] Started
+[2026-06-27 11:20:02.137] [sideband] WebSocket accepted for interview b7af52a2
+[2026-06-27 11:20:02.237] [sideband] Connecting to Vertex AI Live API...
+[2026-06-27 11:20:04.053] [sideband] Connected to Vertex AI Live API!
+[2026-06-27 11:20:04.055] [sideband] Sent initial text prompt
+[2026-06-27 11:20:04.057] [client_to_gemini] Started
+[2026-06-27 11:20:04.062] [gemini_to_client] Started
+[2026-06-27 11:20:04.909] [transcript] AI: Hi Ashish,
+[2026-06-27 11:20:05.250] [transcript] AI: I'm one
+[2026-06-27 11:20:05.681] [transcript] AI: of the
+[2026-06-27 11:20:05.745] [transcript] AI: interviewers
+[2026-06-27 11:20:05.834] [transcript] AI: today.
+[2026-06-27 11:20:05.941] [transcript] AI: Your resume
+[2026-06-27 11:20:06.089] [transcript] AI: mentions
+[2026-06-27 11:20:06.162] [transcript] AI: a "multi-stage
+[2026-06-27 11:20:06.249] [transcript] AI: RAG
+[2026-06-27 11:20:06.269] [transcript] AI: framework
+[2026-06-27 11:20:06.346] [transcript] AI: for radiology
+[2026-06-27 11:20:06.399] [transcript] AI: reports."
+[2026-06-27 11:20:06.586] [transcript] AI: Could
+[2026-06-27 11:20:06.663] [transcript] AI: you tell
+[2026-06-27 11:20:06.751] [transcript] AI: me a bit
+[2026-06-27 11:20:06.823] [transcript] AI: about
+[2026-06-27 11:20:06.879] [transcript] AI: how that
+[2026-06-27 11:20:06.963] [transcript] AI: worked?
+[2026-06-27 11:20:07.124] [gemini_to_client] turn_complete — AI turn #1
+[2026-06-27 11:20:07.158] [db] Saved AI msg (166 chars)
+[2026-06-27 11:20:16.651] [client_to_gemini] activity_start → Vertex AI
+[2026-06-27 11:20:39.154] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 11:20:40.133] [transcript] AI: That's interesting.
+[2026-06-27 11:20:40.305] [transcript] User: {} lockdown scenario, which is AI radiology reports system. Where I upload a che
+[2026-06-27 11:20:40.477] [transcript] AI: Your resume
+[2026-06-27 11:20:40.583] [transcript] AI: also
+[2026-06-27 11:20:40.661] [transcript] AI: lists
+[2026-06-27 11:20:40.759] [transcript] AI: tools
+[2026-06-27 11:20:40.851] [transcript] AI: like
+[2026-06-27 11:20:40.959] [transcript] AI: Groq,
+[2026-06-27 11:20:41.055] [transcript] AI: Composio,
+[2026-06-27 11:20:41.207] [transcript] AI: and
+[2026-06-27 11:20:41.268] [transcript] AI: FAISS.
+[2026-06-27 11:20:41.423] [transcript] AI: How did
+[2026-06-27 11:20:41.589] [transcript] AI: you utilize
+[2026-06-27 11:20:41.685] [transcript] AI: those
+[2026-06-27 11:20:41.733] [transcript] AI: in your
+[2026-06-27 11:20:41.773] [transcript] AI: projects?
+[2026-06-27 11:20:42.012] [gemini_to_client] turn_complete — AI turn #2
+[2026-06-27 11:20:42.025] [db] Saved user msg (333 chars)
+[2026-06-27 11:20:42.035] [db] Saved AI msg (124 chars)
+[2026-06-27 11:20:49.464] [client_to_gemini] activity_start → Vertex AI
+[2026-06-27 11:21:30.085] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 11:21:31.073] [transcript] AI: That's a
+[2026-06-27 11:21:31.279] [transcript] AI: really
+[2026-06-27 11:21:31.336] [transcript] AI: innovative
+[2026-06-27 11:21:31.458] [transcript] AI: approach.
+[2026-06-27 11:21:31.459] [transcript] User: So compodio as a tool calling system, and I won or one the best idea in compodio
+[2026-06-27 11:21:31.562] [transcript] AI: For the
+[2026-06-27 11:21:31.746] [transcript] AI: last
+[2026-06-27 11:21:31.811] [transcript] AI: question,
+[2026-06-27 11:21:31.908] [transcript] AI: could
+[2026-06-27 11:21:31.979] [transcript] AI: you elaborate
+[2026-06-27 11:21:32.107] [transcript] AI: on your
+[2026-06-27 11:21:32.158] [transcript] AI: experience
+[2026-06-27 11:21:32.307] [transcript] AI: with the
+[2026-06-27 11:21:32.412] [transcript] AI: generative
+[2026-06-27 11:21:32.570] [transcript] AI: AI
+[2026-06-27 11:21:32.666] [transcript] AI: 3D
+[2026-06-27 11:21:32.713] [transcript] AI: asset
+[2026-06-27 11:21:32.805] [transcript] AI: pipeline?
+[2026-06-27 11:21:33.005] [gemini_to_client] turn_complete — AI turn #3
+[2026-06-27 11:21:33.022] [db] Saved user msg (433 chars)
+[2026-06-27 11:21:33.042] [db] Saved AI msg (140 chars)
+[2026-06-27 11:21:41.041] [client_to_gemini] activity_start → Vertex AI
+[2026-06-27 11:22:24.009] [client_to_gemini] activity_end → Vertex AI
+[2026-06-27 11:22:25.004] [transcript] AI: Thank you
+[2026-06-27 11:22:25.151] [transcript] AI: so
+[2026-06-27 11:22:25.211] [transcript] AI: much
+[2026-06-27 11:22:25.255] [transcript] AI: for sharing
+[2026-06-27 11:22:25.325] [transcript] AI: those details,
+[2026-06-27 11:22:25.449] [transcript] AI: Ashish.
+[2026-06-27 11:22:25.510] [transcript] User: So, yeah, so I was using the Tripod SR, which is an open-source framework for si
+[2026-06-27 11:22:25.568] [transcript] AI: Your project
+[2026-06-27 11:22:25.813] [transcript] AI: experience
+[2026-06-27 11:22:25.921] [transcript] AI: sounds
+[2026-06-27 11:22:25.959] [transcript] AI: impressive.
+[2026-06-27 11:22:26.129] [transcript] AI: Have a
+[2026-06-27 11:22:26.253] [transcript] AI: great
+[2026-06-27 11:22:26.322] [transcript] AI: day!
+[2026-06-27 11:22:26.478] [gemini_to_client] turn_complete — AI turn #4
+[2026-06-27 11:22:26.510] [db] Saved user msg (450 chars)
+[2026-06-27 11:22:26.528] [db] Saved AI msg (113 chars)
+[2026-06-27 11:22:26.531] [sideband] Ending session (is_final_turn=True, turn=4)

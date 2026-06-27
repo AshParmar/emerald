@@ -10,6 +10,19 @@ from google import genai
 from google.genai import types
 
 import os
+import datetime
+
+_original_print = print
+def print(*args, **kwargs):
+    _original_print(*args, **kwargs)
+    try:
+        msg = " ".join(str(arg) for arg in args)
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        # Write to debug.log in the apps/backend directory
+        with open("debug.log", "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except Exception:
+        pass
 
 # Fix Windows console encoding crash
 try:
@@ -34,13 +47,19 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
     summary = metadata.get("summary", "")
 
     instructions = (
-        "You are a professional AI technical interviewer. Your goal is to interview the candidate "
-        "on their software engineering capabilities. Ask around 3 detailed technical questions based on their resume.\n"
-        "Keep your questions/replies relatively brief (1-3 sentences) as this is a voice conversation.\n"
+        "You are a friendly AI interviewer conducting a simple, resume-based interview.\n"
+        "Your ONLY job is to ask 3 straightforward questions strictly about what is written in the candidate's resume below.\n"
+        "Do NOT ask theory questions, general CS concepts, or anything not directly mentioned in their resume.\n"
+        "Ask about their actual projects, tools they've listed, or experiences they've described — nothing else.\n"
+        "Keep every question and reply short and conversational (1-2 sentences max). This is a voice call.\n"
         "Please speak in English only.\n\n"
         f"Candidate Name: {name}\n"
         f"Technical Skills: {skills}\n"
-        f"Resume Summary: {summary}\n"
+        f"Resume Summary: {summary}\n\n"
+        "RULES:\n"
+        "1. Ask exactly 3 questions, each directly tied to something listed in the resume above.\n"
+        "2. After the candidate answers the 3rd question, thank them warmly, give a brief encouraging closing, "
+        "say goodbye, and append '[INTERVIEW_COMPLETE]' to the very end of your final message."
     )
 
     interview.status = InterviewStatus.IN_PROGRESS
@@ -48,6 +67,7 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
     db.commit()
 
     ai_turn_count = 0
+    is_final_turn = False
 
     try:
         client = genai.Client(
@@ -93,7 +113,7 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
             current_assistant_text = []
             current_user_text = []
             stop_event = asyncio.Event()
-            MAX_TURNS = 10
+            MAX_TURNS = 10  # plenty of headroom for intro + 3 Q&A + conclusion
 
             # ── Task A: Browser → Gemini ───────────────────────────────────────
             async def client_to_gemini():
@@ -122,13 +142,14 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
                 except WebSocketDisconnect:
                     print("[client_to_gemini] Browser disconnected.")
                 except Exception as e:
-                    print(f"[client_to_gemini] Error: {str(e)[:200]}")
+                    import traceback
+                    print(f"[client_to_gemini] Error: {str(e)[:200]}\nTraceback: {traceback.format_exc()}")
                 finally:
                     stop_event.set()
 
             # ── Task B: Gemini → Browser ───────────────────────────────────────
             async def gemini_to_client():
-                nonlocal ai_turn_count
+                nonlocal ai_turn_count, is_final_turn
                 print("[gemini_to_client] Started")
                 try:
                     while not stop_event.is_set():
@@ -141,7 +162,7 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
                                 continue
 
                             # User speech transcription
-                            input_tr = getattr(server_content, 'input_audio_transcription', None)
+                            input_tr = getattr(server_content, 'input_transcription', None)
                             if input_tr:
                                 text = getattr(input_tr, 'text', None)
                                 if text and text.strip():
@@ -149,13 +170,17 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
                                     print(f"[transcript] User: {text.strip()[:80]}")
 
                             # AI speech transcription
-                            output_tr = getattr(server_content, 'output_audio_transcription', None)
+                            output_tr = getattr(server_content, 'output_transcription', None)
                             if output_tr:
                                 text = getattr(output_tr, 'text', None)
                                 if text and text.strip():
-                                    current_assistant_text.append(text.strip())
-                                    print(f"[transcript] AI: {text.strip()[:80]}")
-                                    await websocket.send_json({"transcript": text.strip()})
+                                    if "[INTERVIEW_COMPLETE]" in text or "INTERVIEW_COMPLETE" in text:
+                                        is_final_turn = True
+                                        text = text.replace("[INTERVIEW_COMPLETE]", "").replace("INTERVIEW_COMPLETE", "")
+                                    if text.strip():
+                                        current_assistant_text.append(text.strip())
+                                        print(f"[transcript] AI: {text.strip()[:80]}")
+                                        await websocket.send_json({"transcript": text.strip()})
 
                             # Audio chunks → browser for playback
                             model_turn = server_content.model_turn
@@ -166,8 +191,13 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
                                         await websocket.send_json({"audio": audio_b64})
                                     # Fallback: text parts from non-native models
                                     if part.text and part.text.strip():
-                                        current_assistant_text.append(part.text.strip())
-                                        await websocket.send_json({"transcript": part.text.strip()})
+                                        p_text = part.text
+                                        if "[INTERVIEW_COMPLETE]" in p_text or "INTERVIEW_COMPLETE" in p_text:
+                                            is_final_turn = True
+                                            p_text = p_text.replace("[INTERVIEW_COMPLETE]", "").replace("INTERVIEW_COMPLETE", "")
+                                        if p_text.strip():
+                                            current_assistant_text.append(p_text.strip())
+                                            await websocket.send_json({"transcript": p_text.strip()})
 
                             # Turn complete
                             if server_content.turn_complete:
@@ -194,26 +224,42 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
                                 else:
                                     print(f"[db] No transcription text this turn (model may not support it)")
 
-                                # End after MAX_TURNS
-                                if ai_turn_count >= MAX_TURNS:
-                                    print("[sideband] Max turns reached — ending session")
+                                # Send interview_complete ONLY here — after turn_complete — so all
+                                # audio chunks for the final turn have already been forwarded to the
+                                # browser before it triggers endInterview().
+                                if is_final_turn or ai_turn_count >= MAX_TURNS:
+                                    print(f"[sideband] Ending session (is_final_turn={is_final_turn}, turn={ai_turn_count})")
                                     await websocket.send_json({"interview_complete": True})
-                                    stop_event.set()
+                                    await asyncio.sleep(3600)  # hold open while frontend drains audio
                                     return
 
                                 await websocket.send_json({"turn_complete": True})
                                 break  # re-enter session.receive() for next turn
 
                 except Exception as e:
-                    if not stop_event.is_set():
-                        print(f"[gemini_to_client] Error: {str(e)[:200]}")
+                        import traceback
+                        print(f"[gemini_to_client] Error: {str(e)[:200]}\nTraceback: {traceback.format_exc()}")
                 finally:
                     stop_event.set()
 
-            await asyncio.gather(client_to_gemini(), gemini_to_client())
+            task_client = asyncio.create_task(client_to_gemini())
+            task_gemini = asyncio.create_task(gemini_to_client())
+
+            done, pending = await asyncio.wait(
+                [task_client, task_gemini],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
     except Exception as e:
-        print(f"[sideband] Session failed: {str(e)[:300]}")
+        import traceback
+        print(f"[sideband] Session failed: {str(e)[:300]}\nTraceback: {traceback.format_exc()}")
     finally:
         # If transcription returned nothing (native-audio model limitation),
         # save a profile-based summary so the grader has context
@@ -239,7 +285,8 @@ async def handle_gemini_live_session(websocket: WebSocket, interview_id: str, db
                     s.commit()
                 print("[db] Saved profile summary for grading context")
         except Exception as e:
-            print(f"[sideband] Finally block error: {e}")
+            import traceback
+            print(f"[sideband] Finally block error: {e}\nTraceback: {traceback.format_exc()}")
 
         try:
             await websocket.close()

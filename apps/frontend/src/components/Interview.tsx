@@ -64,6 +64,8 @@ export function Interview() {
     // Playback timing queue for AI audio chunks
     const nextPlayTimeRef = useRef<number>(0);
     const aiAnalyserRef = useRef<AnalyserNode | null>(null);
+    const hasEndedRef = useRef<boolean>(false);
+    const micUnmutedTimeRef = useRef<number>(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -224,12 +226,22 @@ export function Interview() {
                     playPcmChunk(data.audio);
                 }
                 
+                // If interview is complete
+                if (data.interview_complete) {
+                    const drainMs = Math.max(1000, (nextPlayTimeRef.current - (playbackCtxRef.current?.currentTime ?? 0)) * 1000 + 400);
+                    setTimeout(() => {
+                        console.log("[interview_complete] AI finished speaking conclusion — ending interview");
+                        endInterview();
+                    }, drainMs);
+                }
+                
                 // When AI finishes its turn — wait for audio to drain, then unmute mic for user
                 if (data.turn_complete) {
                     const drainMs = Math.max(1000, (nextPlayTimeRef.current - (playbackCtxRef.current?.currentTime ?? 0)) * 1000 + 400);
                     setTimeout(() => {
                         isAiSpeakingRef.current = false;
                         isMicActiveRef.current = true;
+                        micUnmutedTimeRef.current = performance.now();
                         // Physically unmute the mic track so Vertex AI VAD can hear user
                         userStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = true; });
                         console.log("[turn_complete] AI audio drained — mic unmuted for user");
@@ -239,7 +251,14 @@ export function Interview() {
             };
 
             backendWs.onclose = () => {
+                if (hasEndedRef.current) return;
                 setStatus("ending");
+                setTimeout(() => {
+                    if (hasEndedRef.current) return;
+                    hasEndedRef.current = true;
+                    cleanup();
+                    navigate(`/result/${interviewId}`);
+                }, 1500);
             };
 
             // 4. Stream mic to Deepgram for live user transcriptions
@@ -282,7 +301,8 @@ export function Interview() {
             // VAD variables
             let isUserCurrentlySpeaking = false;
             let lastSpeechTime = performance.now();
-            const SILENCE_THRESHOLD = 0.03;
+            let consecutiveSpeechFrames = 0;
+            const SILENCE_THRESHOLD = 0.07;
             const SILENCE_DURATION_MS = 1500;
             const ACTIVITY_END_COOLDOWN_MS = 3000; // prevent spamming activity_end
 
@@ -295,10 +315,11 @@ export function Interview() {
                     const currentLevel = userMeter();
                     setUserLevel(currentLevel);
 
-                    // Only do VAD when AI is NOT speaking and mic is open
-                    if (!isAiSpeakingRef.current && isMicActiveRef.current) {
+                    // Only do VAD when AI is NOT speaking, mic is open, and guard window (600ms) has passed
+                    if (!isAiSpeakingRef.current && isMicActiveRef.current && (performance.now() - micUnmutedTimeRef.current > 600)) {
                         if (currentLevel > SILENCE_THRESHOLD) {
-                            if (!isUserCurrentlySpeaking) {
+                            consecutiveSpeechFrames++;
+                            if (!isUserCurrentlySpeaking && consecutiveSpeechFrames >= 8) {
                                 // User just started speaking — signal Vertex AI to start collecting audio
                                 isUserCurrentlySpeaking = true;
                                 console.log("[VAD] User started speaking — sending activity_start");
@@ -308,6 +329,7 @@ export function Interview() {
                             }
                             lastSpeechTime = performance.now();
                         } else {
+                            consecutiveSpeechFrames = 0;
                             if (isUserCurrentlySpeaking && (performance.now() - lastSpeechTime > SILENCE_DURATION_MS)) {
                                 isUserCurrentlySpeaking = false;
                                 const now = performance.now();
@@ -323,10 +345,13 @@ export function Interview() {
                                 }
                             }
                         }
-                    } else if (isAiSpeakingRef.current) {
-                        // AI is speaking — reset user speech state so we don't get false triggers
-                        isUserCurrentlySpeaking = false;
-                        lastSpeechTime = performance.now();
+                    } else {
+                        consecutiveSpeechFrames = 0;
+                        if (isAiSpeakingRef.current) {
+                            // AI is speaking — reset user speech state so we don't get false triggers
+                            isUserCurrentlySpeaking = false;
+                            lastSpeechTime = performance.now();
+                        }
                     }
                 }
                 
@@ -392,6 +417,8 @@ export function Interview() {
     }
 
     function endInterview() {
+        if (hasEndedRef.current) return;
+        hasEndedRef.current = true;
         setStatus("ending");
         cleanup();
         navigate(`/result/${interviewId}`);
